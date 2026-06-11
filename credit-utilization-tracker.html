@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Statement Date Tool — Know What Your Card Actually Reports | UtilizationCheck</title>
+<meta name="description" content="Free credit utilization tool. Find out exactly how much to pay before your statement closes — not your due date — so your card reports a low balance to the credit bureaus." />
+<style>
+  :root {
+    --ink: #14110f;
+    --paper: #faf7f2;
+    --line: #e6ddd0;
+    --muted: #8a7f72;
+    --accent: #1f6b4f;       /* statement-locked green */
+    --accent-soft: #e3efe8;
+    --warn: #c4622d;          /* over target */
+    --warn-soft: #f6e6db;
+    --danger: #b13636;
+    --shadow: 0 1px 0 rgba(20,17,15,0.04), 0 12px 40px -20px rgba(20,17,15,0.25);
+    --mono: "SF Mono", "Roboto Mono", ui-monospace, "Cascadia Code", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 22px; }
+
+  /* ---- Masthead ---- */
+  header.top {
+    border-bottom: 1px solid var(--line);
+    padding: 18px 0;
+  }
+  .brand {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .brand b { color: var(--ink); font-weight: 600; }
+  .brand .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: inline-block; }
+
+  /* ---- Hero ---- */
+  .hero { padding: 58px 0 34px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-size: clamp(30px, 6vw, 46px);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+    font-weight: 680;
+    margin-bottom: 18px;
+  }
+  h1 .quiet { color: var(--muted); font-weight: 680; }
+  .lede {
+    font-size: 18px;
+    color: #4a443c;
+    max-width: 52ch;
+  }
+
+  /* ---- Tool card ---- */
+  .calc {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin: 8px 0 14px;
+  }
+  .calc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .field {
+    padding: 20px;
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+  .field:nth-child(even) { border-right: none; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin-bottom: 9px;
+  }
+  .field .hint { color: var(--muted); font-weight: 400; }
+  .input-mono {
+    width: 100%;
+    font-family: var(--mono);
+    font-size: 19px;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    outline: none;
+    padding: 0;
+  }
+  .input-mono::placeholder { color: #cabfae; }
+  .input-wrap { display: flex; align-items: baseline; gap: 6px; }
+  .input-wrap .pre { font-family: var(--mono); font-size: 19px; color: var(--muted); }
+  input[type="date"].input-mono { font-size: 16px; }
+
+  .target-row {
+    grid-column: 1 / -1;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .target-row label { font-size: 13px; font-weight: 600; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button {
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 7px 13px;
+    background: #fff;
+    border: none;
+    border-right: 1px solid var(--line);
+    cursor: pointer;
+    color: var(--muted);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.on { background: var(--accent); color: #fff; }
+
+  /* ---- Result ---- */
+  .result {
+    border-top: 2px solid var(--ink);
+    padding: 26px 22px;
+    background: var(--accent-soft);
+  }
+  .result.over { background: var(--warn-soft); }
+  .result.empty { background: #f3efe7; }
+  .result-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .result-main {
+    font-size: clamp(22px, 5vw, 30px);
+    letter-spacing: -0.01em;
+    line-height: 1.18;
+    font-weight: 640;
+  }
+  .result-main .amt { color: var(--accent); }
+  .result.over .result-main .amt { color: var(--warn); }
+  .result-sub { margin-top: 12px; font-size: 15px; color: #4a443c; }
+  .result-sub b { font-weight: 640; }
+
+  /* utilization bar */
+  .bar-block { margin-top: 20px; }
+  .bar-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+  .bar-top .u-now { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+  .bar-top .u-cap { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .bar {
+    height: 12px;
+    border-radius: 7px;
+    background: #ded5c7;
+    position: relative;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 7px;
+    background: var(--accent);
+    transition: width 0.5s cubic-bezier(.4,0,.2,1), background 0.3s;
+    width: 0%;
+  }
+  .bar-fill.warn { background: var(--warn); }
+  .bar-fill.danger { background: var(--danger); }
+  .bar-target {
+    position: absolute; top: -3px; bottom: -3px; width: 2px;
+    background: var(--ink);
+  }
+  .bar-target::after {
+    content: attr(data-label);
+    position: absolute; top: -17px; left: 50%; transform: translateX(-50%);
+    font-family: var(--mono); font-size: 10px; color: var(--ink); white-space: nowrap;
+  }
+
+  .deep { margin-top: 14px; font-size: 13px; color: var(--muted); font-family: var(--mono); }
+  .deep b { color: var(--accent); }
+
+  /* ---- prose / SEO content ---- */
+  main.prose { padding: 18px 0 70px; }
+  .prose h2 {
+    font-size: 24px;
+    letter-spacing: -0.01em;
+    margin: 44px 0 14px;
+    font-weight: 660;
+  }
+  .prose h2 .num {
+    font-family: var(--mono); font-size: 13px; color: var(--accent);
+    margin-right: 10px; vertical-align: 2px;
+  }
+  .prose p { margin-bottom: 14px; color: #383229; font-size: 16.5px; }
+  .prose p .k { font-weight: 640; color: var(--ink); }
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: #fff;
+    border-radius: 0 10px 10px 0;
+    padding: 16px 18px;
+    margin: 18px 0;
+    font-size: 15.5px;
+    box-shadow: var(--shadow);
+  }
+  .callout .tag {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 6px;
+  }
+
+  /* timeline signature */
+  .timeline {
+    margin: 22px 0 8px;
+    padding: 22px 20px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+  }
+  .tl-track { position: relative; height: 3px; background: var(--line); margin: 30px 4px 70px; }
+  .tl-fill { position: absolute; height: 3px; background: var(--accent); left: 0; width: 62%; }
+  .tl-node { position: absolute; top: -6px; width: 15px; height: 15px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); transform: translateX(-50%); }
+  .tl-node.due { border-color: var(--muted); }
+  .tl-lab { position: absolute; bottom: -64px; font-size: 11px; width: 150px; }
+  .tl-lab .d { font-family: var(--mono); font-size: 11px; font-weight: 600; display: block; margin-bottom: 3px; }
+  .tl-lab .t { color: var(--muted); display: block; line-height: 1.3; }
+  /* edge-aware alignment: left label hugs left, right label hugs right, middle centers */
+  .tl-lab.at-start { left: 0; text-align: left; }
+  .tl-lab.at-mid   { left: 62%; transform: translateX(-50%); text-align: center; }
+  .tl-lab.at-end   { right: 0; text-align: right; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 26px 0 40px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  footer p { margin-bottom: 8px; }
+  footer .disc { font-size: 12px; line-height: 1.6; }
+
+  @media (max-width: 560px) {
+    .calc-grid { grid-template-columns: 1fr; }
+    .field { border-right: none; }
+    .hero { padding: 40px 0 26px; }
+  }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <div class="brand"><span class="dot"></span> Utilization<b>Check</b></div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <section class="hero">
+      <div class="eyebrow">Statement date · not due date</div>
+      <h1>Your card reports the balance it sees <span class="quiet">on closing day — not when you pay.</span></h1>
+      <p class="lede">Pay by the due date and the high balance was already reported. Enter your card below to see exactly how much to pay <em>before the statement closes</em>.</p>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <div id="app"></div>
+  </div>
+
+  <div class="wrap">
+    <main class="prose">
+      <h2><span class="num">01</span>What credit utilization actually is</h2>
+      <p><span class="k">Utilization</span> is the percentage of your available credit you're using: your reported balance divided by your credit limit. If you have a $10,000 limit and $3,000 reports, that's 30% utilization. It's one of the biggest factors in your score — second only to payment history for most scoring models.</p>
+      <p>The number that matters isn't what you owe <em>today</em>. It's the balance your card sends to the credit bureaus, and that snapshot happens once a month.</p>
+
+      <h2><span class="num">02</span>Statement date vs. due date — the part everyone misses</h2>
+      <p>These are two different dates and confusing them is the single most common utilization mistake.</p>
+      <div class="callout">
+        <span class="tag">The closing date is the snapshot</span>
+        Your <span class="k">statement closing date</span> is when the billing cycle ends. Whatever your balance is at that moment is what gets reported to the bureaus. Your <span class="k">due date</span> comes about three weeks later — paying by then keeps you out of interest and late fees, but the balance was already photographed on closing day.
+      </div>
+      <p>So you can pay your statement in full, never carry interest, and <em>still</em> show high utilization on your credit report — because you paid after the snapshot, not before it. To report a low balance, you pay down <span class="k">before the closing date</span>.</p>
+
+      <h2><span class="num">03</span>What number should you aim for?</h2>
+      <p>Under <span class="k">30%</span> is the common guideline, but it's a ceiling, not a goal. The lowest scores come from people reporting in the single digits. Many people target <span class="k">under 10%</span> on the cards they want reporting low — and some leave a small balance (1–9%) rather than reporting exactly zero, since a tiny reported balance can score slightly better than none at all.</p>
+      <p>This applies per card <em>and</em> across all your cards combined. The tool above handles one card; total utilization across every card is where a multi-card view helps — that's on the roadmap.</p>
+
+      <h2><span class="num">04</span>Does paying early actually help?</h2>
+      <p>Yes — timing is the whole lever. Paying down before the closing date lowers the balance that gets reported, which lowers your utilization, which can lift your score within a cycle or two as the new balance reports. Nothing else about your behavior has to change. You're just moving the payment to <em>before</em> the snapshot instead of after.</p>
+    </main>
+  </div>
+
+  <footer>
+    <div class="wrap">
+      <p style="font-weight:600;color:var(--ink);">UtilizationCheck — a free tool, nothing to install.</p>
+      <p class="disc">This is an educational tool, not financial advice. It estimates based on the numbers you enter and doesn't connect to your bank or credit report. Scoring models vary; exact effects on your score aren't guaranteed. Confirm your statement closing date on your card issuer's app or website — it's often a few days before your due date.</p>
+    </div>
+  </footer>
+
+<script>
+(function () {
+  function fmt(n) {
+    if (n === null || n === undefined || isNaN(n)) return "\u2014";
+    return "$" + Math.round(n).toLocaleString("en-US");
+  }
+  function daysFromToday(iso) {
+    if (!iso) return null;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d = new Date(iso + "T00:00:00");
+    return Math.round((d - today) / 86400000);
+  }
+  // adds thousands separators to a raw numeric string for display
+  function withCommas(raw) {
+    if (raw === "" || raw === null) return "";
+    var parts = raw.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return parts.join(".");
+  }
+
+  var state = { limit: "", balance: "", closeDate: "", target: 30 };
+  var app = document.getElementById("app");
+
+  app.innerHTML = ''
+    + '<div class="calc">'
+    +   '<div class="calc-grid">'
+    +     '<div class="field">'
+    +       '<label>Credit limit</label>'
+    +       '<div class="input-wrap"><span class="pre">$</span>'
+    +         '<input id="f-limit" class="input-mono" inputmode="numeric" placeholder="10,000" autocomplete="off"></div>'
+    +     '</div>'
+    +     '<div class="field">'
+    +       '<label>Current balance</label>'
+    +       '<div class="input-wrap"><span class="pre">$</span>'
+    +         '<input id="f-balance" class="input-mono" inputmode="numeric" placeholder="3,400" autocomplete="off"></div>'
+    +     '</div>'
+    +     '<div class="field" style="grid-column:1 / -1;border-right:none">'
+    +       '<label>Statement closing date <span class="hint">\u2014 not your due date</span></label>'
+    +       '<input id="f-date" type="date" class="input-mono">'
+    +     '</div>'
+    +     '<div class="target-row">'
+    +       '<label>Target utilization</label>'
+    +       '<div class="seg" id="f-seg">'
+    +         '<button data-t="30" class="on">30%</button>'
+    +         '<button data-t="10">10%</button>'
+    +         '<button data-t="9">&lt;10%</button>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div class="result empty" id="f-result"></div>'
+    + '</div>'
+    + '<div class="timeline">'
+    +   '<div class="tl-track">'
+    +     '<div class="tl-fill"></div>'
+    +     '<div class="tl-node" style="left:0%"></div>'
+    +     '<div class="tl-node" style="left:62%"></div>'
+    +     '<div class="tl-node due" style="left:100%"></div>'
+    +     '<div class="tl-lab at-start"><span class="d">Cycle starts</span><span class="t">billing period begins</span></div>'
+    +     '<div class="tl-lab at-mid"><span class="d" style="color:var(--accent)">Closing date</span><span class="t">balance is photographed \u2192 reported</span></div>'
+    +     '<div class="tl-lab at-end"><span class="d">Due date</span><span class="t">pay now = no interest, but too late to change what reported</span></div>'
+    +   '</div>'
+    + '</div>';
+
+  var resultEl = document.getElementById("f-result");
+
+  function compute() {
+    var lim = parseFloat(state.limit) || 0;
+    var bal = parseFloat(state.balance) || 0;
+    if (lim <= 0) return null;
+    var util = (bal / lim) * 100;
+    var targetBal = lim * (state.target / 100);
+    var payTo = Math.max(0, bal - targetBal);
+    var reportedAfter = Math.max(0, bal - payTo);
+    var subTen = lim * 0.10;
+    var payToTen = Math.max(0, bal - subTen);
+    return { lim: lim, bal: bal, util: util, payTo: payTo, reportedAfter: reportedAfter, payToTen: payToTen, subTen: subTen };
+  }
+
+  function render() {
+    var c = compute();
+    var t = state.target;
+    var tLabel = (t === 9 ? "under 10" : t);
+    var days = daysFromToday(state.closeDate);
+
+    if (!c) {
+      resultEl.className = "result empty";
+      resultEl.innerHTML = '<div class="result-label">Waiting on your numbers</div>'
+        + '<div class="result-main">Enter your limit and balance to see what to pay.</div>';
+      return;
+    }
+
+    resultEl.className = "result" + (c.util > t ? " over" : "");
+
+    var html = "";
+    if (c.payTo > 0) {
+      var when = state.closeDate ? "your statement closes" : "the closing date";
+      var dayStr = (days !== null && days >= 0) ? ' \u2014 <b>' + days + ' day' + (days === 1 ? '' : 's') + '</b> from now.' : '.';
+      html += '<div class="result-label">Pay down before closing</div>'
+        + '<div class="result-main">Pay <span class="amt">' + fmt(c.payTo) + '</span> before ' + when + dayStr + '</div>'
+        + '<div class="result-sub">That drops your reported balance to <b>' + fmt(c.reportedAfter) + '</b>, landing you at <b>' + tLabel + '%</b> utilization.</div>';
+    } else {
+      html += '<div class="result-label">You\u2019re already there</div>'
+        + '<div class="result-main">At <span class="amt">' + c.util.toFixed(0) + '%</span>, you\u2019re already under your ' + (t === 9 ? "10" : t) + '% target \u2014 nothing to pay down.</div>'
+        + '<div class="result-sub">If the balance holds through your closing date, that\u2019s what reports.</div>';
+    }
+
+    var barWidth = Math.min(100, c.util);
+    var barClass = "";
+    if (c.util > t) barClass = "warn";
+    if (c.util > 50) barClass = "danger";
+    var markLeft = (t === 9 ? 10 : t);
+    var markLabel = (t === 9 ? "<10" : t) + "%";
+
+    html += '<div class="bar-block">'
+      + '<div class="bar-top"><span class="u-now">' + c.util.toFixed(1) + '% used now</span>'
+      + '<span class="u-cap">' + fmt(c.bal) + ' of ' + fmt(c.lim) + '</span></div>'
+      + '<div class="bar"><div class="bar-fill ' + barClass + '" style="width:' + barWidth + '%"></div>'
+      + '<div class="bar-target" data-label="' + markLabel + '" style="left:' + markLeft + '%"></div></div>';
+    if (t !== 9 && c.payToTen > 0) {
+      html += '<div class="deep">To reach under 10% instead, pay down <b>' + fmt(c.payToTen) + '</b> (reports ' + fmt(c.subTen) + ').</div>';
+    }
+    html += '</div>';
+
+    resultEl.innerHTML = html;
+  }
+
+  document.getElementById("f-limit").addEventListener("input", function (e) {
+    state.limit = e.target.value.replace(/[^0-9.]/g, "");
+    e.target.value = withCommas(state.limit);
+    render();
+  });
+  document.getElementById("f-balance").addEventListener("input", function (e) {
+    state.balance = e.target.value.replace(/[^0-9.]/g, "");
+    e.target.value = withCommas(state.balance);
+    render();
+  });
+  document.getElementById("f-date").addEventListener("input", function (e) {
+    state.closeDate = e.target.value; render();
+  });
+  document.getElementById("f-seg").addEventListener("click", function (e) {
+    var btn = e.target.closest("button");
+    if (!btn) return;
+    state.target = parseInt(btn.getAttribute("data-t"), 10);
+    var btns = this.querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove("on");
+    btn.classList.add("on");
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
