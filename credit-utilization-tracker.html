@@ -168,6 +168,14 @@
   .result.over .result-main .amt { color: var(--warn); }
   .result-sub { margin-top: 12px; font-size: 15px; color: #4a443c; }
   .result-sub b { font-weight: 640; }
+  .overlimit-note {
+    margin-top: 16px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(177, 54, 54, 0.09);
+    color: var(--danger);
+    font-size: 13px;
+  }
 
   /* utilization bar */
   .bar-block { margin-top: 20px; }
@@ -244,6 +252,7 @@
   .tl-fill { position: absolute; height: 3px; background: var(--accent); left: 0; width: 62%; }
   .tl-node { position: absolute; top: -6px; width: 15px; height: 15px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); transform: translateX(-50%); }
   .tl-node.due { border-color: var(--muted); }
+  .tl-node.today { top: -3px; width: 9px; height: 9px; border: none; background: var(--ink); }
   .tl-lab { position: absolute; bottom: -64px; font-size: 11px; width: 150px; }
   .tl-lab .d { font-family: var(--mono); font-size: 11px; font-weight: 600; display: block; margin-bottom: 3px; }
   .tl-lab .t { color: var(--muted); display: block; line-height: 1.3; }
@@ -344,43 +353,81 @@
     + '<div class="calc">'
     +   '<div class="calc-grid">'
     +     '<div class="field">'
-    +       '<label>Credit limit</label>'
+    +       '<label for="f-limit">Credit limit</label>'
     +       '<div class="input-wrap"><span class="pre">$</span>'
     +         '<input id="f-limit" class="input-mono" inputmode="numeric" placeholder="10,000" autocomplete="off"></div>'
     +     '</div>'
     +     '<div class="field">'
-    +       '<label>Current balance</label>'
+    +       '<label for="f-balance">Current balance</label>'
     +       '<div class="input-wrap"><span class="pre">$</span>'
     +         '<input id="f-balance" class="input-mono" inputmode="numeric" placeholder="3,400" autocomplete="off"></div>'
     +     '</div>'
     +     '<div class="field" style="grid-column:1 / -1;border-right:none">'
-    +       '<label>Statement closing date <span class="hint">\u2014 not your due date</span></label>'
+    +       '<label for="f-date">Statement closing date <span class="hint">\u2014 not your due date</span></label>'
     +       '<input id="f-date" type="date" class="input-mono">'
     +     '</div>'
     +     '<div class="target-row">'
     +       '<label>Target utilization</label>'
-    +       '<div class="seg" id="f-seg">'
-    +         '<button data-t="30" class="on">30%</button>'
-    +         '<button data-t="10">10%</button>'
-    +         '<button data-t="9">&lt;10%</button>'
+    +       '<div class="seg" id="f-seg" role="radiogroup" aria-label="Target utilization">'
+    +         '<button data-t="30" class="on" role="radio" aria-checked="true">30%</button>'
+    +         '<button data-t="10" role="radio" aria-checked="false">10%</button>'
+    +         '<button data-t="9" role="radio" aria-checked="false">&lt;10%</button>'
     +       '</div>'
     +     '</div>'
     +   '</div>'
-    +   '<div class="result empty" id="f-result"></div>'
+    +   '<div class="result empty" id="f-result" role="status" aria-live="polite"></div>'
     + '</div>'
     + '<div class="timeline">'
-    +   '<div class="tl-track">'
-    +     '<div class="tl-fill"></div>'
-    +     '<div class="tl-node" style="left:0%"></div>'
-    +     '<div class="tl-node" style="left:62%"></div>'
-    +     '<div class="tl-node due" style="left:100%"></div>'
-    +     '<div class="tl-lab at-start"><span class="d">Cycle starts</span><span class="t">billing period begins</span></div>'
-    +     '<div class="tl-lab at-mid"><span class="d" style="color:var(--accent)">Closing date</span><span class="t">balance is photographed \u2192 reported</span></div>'
-    +     '<div class="tl-lab at-end"><span class="d">Due date</span><span class="t">pay now = no interest, but too late to change what reported</span></div>'
-    +   '</div>'
+    +   '<div class="tl-track" id="f-timeline"></div>'
     + '</div>';
 
   var resultEl = document.getElementById("f-result");
+  var timelineEl = document.getElementById("f-timeline");
+
+  function fmtDate(d) {
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
+  function nextOccurrence(iso) {
+    // next monthly recurrence of that day-of-month that is >= today, returns a Date
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d = new Date(iso + "T00:00:00");
+    while (d < today) { d = new Date(d.getFullYear(), d.getMonth()+1, d.getDate()); }
+    return d;
+  }
+
+  function renderTimeline() {
+    if (!state.closeDate) {
+      timelineEl.innerHTML = '<div class="tl-fill"></div>'
+        + '<div class="tl-node" style="left:0%"></div>'
+        + '<div class="tl-node" style="left:62%"></div>'
+        + '<div class="tl-node due" style="left:100%"></div>'
+        + '<div class="tl-lab at-start"><span class="d">Cycle starts</span><span class="t">billing period begins</span></div>'
+        + '<div class="tl-lab at-mid"><span class="d" style="color:var(--accent)">Closing date</span><span class="t">balance is photographed \u2192 reported</span></div>'
+        + '<div class="tl-lab at-end"><span class="d">Due date</span><span class="t">pay now = no interest, but too late to change what reported</span></div>';
+      return;
+    }
+
+    var close = new Date(state.closeDate + "T00:00:00");
+    var cycleStart = new Date(close.getFullYear(), close.getMonth()-1, close.getDate());
+    var due = new Date(close.getTime() + 21*86400000);
+    var span = due - cycleStart;
+    var posClose = (close - cycleStart) / span * 100;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var posToday = Math.max(0, Math.min(100, (today - cycleStart) / span * 100));
+    var todayNode = (today >= cycleStart && today <= due)
+      ? '<div class="tl-node today" style="left:' + posToday + '%"></div>'
+      : '';
+
+    timelineEl.innerHTML = '<div class="tl-fill" style="width:' + posToday + '%"></div>'
+      + '<div class="tl-node" style="left:0%"></div>'
+      + '<div class="tl-node" style="left:' + posClose + '%"></div>'
+      + '<div class="tl-node due" style="left:100%"></div>'
+      + todayNode
+      + '<div class="tl-lab at-start"><span class="d">' + fmtDate(cycleStart) + '</span><span class="t">billing period begins</span></div>'
+      + '<div class="tl-lab at-mid" style="left:' + posClose + '%"><span class="d" style="color:var(--accent)">' + fmtDate(close) + '</span><span class="t">balance reported to bureaus</span></div>'
+      + '<div class="tl-lab at-end"><span class="d">' + fmtDate(due) + '</span><span class="t">pay by here \u2014 too late to change what reported</span></div>';
+  }
 
   function compute() {
     var lim = parseFloat(state.limit) || 0;
@@ -396,10 +443,18 @@
   }
 
   function render() {
+    renderTimeline();
     var c = compute();
     var t = state.target;
     var tLabel = (t === 9 ? "under 10" : t);
-    var days = daysFromToday(state.closeDate);
+    var rawDays = daysFromToday(state.closeDate);
+    var days = rawDays;
+    var dayNote = "";
+    if (rawDays !== null && rawDays < 0) {
+      var today = new Date(); today.setHours(0,0,0,0);
+      days = Math.round((nextOccurrence(state.closeDate) - today) / 86400000);
+      dayNote = " (your next statement close)";
+    }
 
     if (!c) {
       resultEl.className = "result empty";
@@ -413,7 +468,7 @@
     var html = "";
     if (c.payTo > 0) {
       var when = state.closeDate ? "your statement closes" : "the closing date";
-      var dayStr = (days !== null && days >= 0) ? ' \u2014 <b>' + days + ' day' + (days === 1 ? '' : 's') + '</b> from now.' : '.';
+      var dayStr = (days !== null && days >= 0) ? ' \u2014 <b>' + days + ' day' + (days === 1 ? '' : 's') + '</b> from now' + dayNote + '.' : '.';
       html += '<div class="result-label">Pay down before closing</div>'
         + '<div class="result-main">Pay <span class="amt">' + fmt(c.payTo) + '</span> before ' + when + dayStr + '</div>'
         + '<div class="result-sub">That drops your reported balance to <b>' + fmt(c.reportedAfter) + '</b>, landing you at <b>' + tLabel + '%</b> utilization.</div>';
@@ -429,6 +484,10 @@
     if (c.util > 50) barClass = "danger";
     var markLeft = (t === 9 ? 10 : t);
     var markLabel = (t === 9 ? "<10" : t) + "%";
+
+    if (c.util > 100) {
+      html += '<div class="overlimit-note">\u26A0 You\u2019re over your credit limit. That\u2019s the worst case for utilization and can also trigger an over-limit fee \u2014 bringing the balance under your limit should be the first priority.</div>';
+    }
 
     html += '<div class="bar-block">'
       + '<div class="bar-top"><span class="u-now">' + c.util.toFixed(1) + '% used now</span>'
@@ -461,8 +520,12 @@
     if (!btn) return;
     state.target = parseInt(btn.getAttribute("data-t"), 10);
     var btns = this.querySelectorAll("button");
-    for (var i = 0; i < btns.length; i++) btns[i].classList.remove("on");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.remove("on");
+      btns[i].setAttribute("aria-checked", "false");
+    }
     btn.classList.add("on");
+    btn.setAttribute("aria-checked", "true");
     render();
   });
 
