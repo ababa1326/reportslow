@@ -185,6 +185,8 @@
   .result.over .result-main .amt { color: var(--warn); }
   .result-sub { margin-top: 12px; font-size: 15px; color: #4a443c; }
   .result-sub b { font-weight: 640; }
+  .est-note { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .est-note b { color: var(--accent); font-weight: 640; }
   .overlimit-note {
     margin-top: 16px;
     padding: 10px 12px;
@@ -404,7 +406,7 @@
     return parts.join(".");
   }
 
-  var state = { limit: "", balance: "", closeDate: "", target: 30 };
+  var state = { limit: "", balance: "", dateVal: "", dateMode: "due", target: 30 };
   var app = document.getElementById("app");
 
   app.innerHTML = ''
@@ -421,8 +423,15 @@
     +         '<input id="f-balance" class="input-mono" inputmode="numeric" placeholder="3,400" autocomplete="off"></div>'
     +     '</div>'
     +     '<div class="field" style="grid-column:1 / -1;border-right:none">'
-    +       '<label for="f-date">Statement closing date <span class="hint">\u2014 not your due date</span></label>'
-    +       '<input id="f-date" type="date" class="input-mono">'
+    +       '<label>Which date do you know?</label>'
+    +       '<div class="seg" id="f-datemode" role="radiogroup" aria-label="Which date do you know" style="display:inline-flex">'
+    +         '<button data-m="due" class="on" role="radio" aria-checked="true">Due date</button>'
+    +         '<button data-m="close" role="radio" aria-checked="false">Closing date</button>'
+    +       '</div>'
+    +       '<div style="margin-top:16px">'
+    +         '<label id="f-date-label" for="f-date">Payment due date <span class="hint">— the day your payment is due</span></label>'
+    +         '<input id="f-date" type="date" class="input-mono">'
+    +       '</div>'
     +     '</div>'
     +     '<div class="target-row">'
     +       '<label>Target utilization</label>'
@@ -446,6 +455,23 @@
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
 
+  // Resolves whatever date the user knows into the UPCOMING closing cycle.
+  // due mode: closing is estimated as due - 21 days. Either way, roll forward to
+  // the next cycle whose closing date is today or later.
+  function cycleDates() {
+    if (!state.dateVal) return null;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var entered = new Date(state.dateVal + "T00:00:00");
+    var close = (state.dateMode === "due")
+      ? new Date(entered.getTime() - 21*86400000)
+      : entered;
+    while (close < today) {
+      close = new Date(close.getFullYear(), close.getMonth()+1, close.getDate());
+    }
+    var due = new Date(close.getTime() + 21*86400000);
+    return { close: close, due: due, estimated: state.dateMode === "due" };
+  }
+
   function nextOccurrence(iso) {
     // next monthly recurrence of that day-of-month that is >= today, returns a Date
     var today = new Date(); today.setHours(0,0,0,0);
@@ -455,20 +481,21 @@
   }
 
   function renderTimeline() {
-    if (!state.closeDate) {
+    var cyc = cycleDates();
+    if (!cyc) {
       timelineEl.innerHTML = '<div class="tl-fill"></div>'
         + '<div class="tl-node" style="left:0%"></div>'
         + '<div class="tl-node" style="left:62%"></div>'
         + '<div class="tl-node due" style="left:100%"></div>'
         + '<div class="tl-lab at-start"><span class="d">Cycle starts</span><span class="t">billing period begins</span></div>'
-        + '<div class="tl-lab at-mid"><span class="d" style="color:var(--accent)">Closing date</span><span class="t">balance is photographed \u2192 reported</span></div>'
+        + '<div class="tl-lab at-mid"><span class="d" style="color:var(--accent)">Closing date</span><span class="t">balance is photographed → reported</span></div>'
         + '<div class="tl-lab at-end"><span class="d">Due date</span><span class="t">pay now = no interest, but too late to change what reported</span></div>';
       return;
     }
 
-    var close = new Date(state.closeDate + "T00:00:00");
+    var close = cyc.close;
+    var due = cyc.due;
     var cycleStart = new Date(close.getFullYear(), close.getMonth()-1, close.getDate());
-    var due = new Date(close.getTime() + 21*86400000);
     var span = due - cycleStart;
     var posClose = (close - cycleStart) / span * 100;
     var today = new Date(); today.setHours(0,0,0,0);
@@ -477,14 +504,19 @@
       ? '<div class="tl-node today" style="left:' + posToday + '%"></div>'
       : '';
 
+    var closeEst = (state.dateMode === "due");
+    var dueEst = (state.dateMode === "close");
+    var closeLab = (closeEst ? "≈ " : "") + fmtDate(close);
+    var dueLab = (dueEst ? "≈ " : "") + fmtDate(due);
+
     timelineEl.innerHTML = '<div class="tl-fill" style="width:' + posToday + '%"></div>'
       + '<div class="tl-node" style="left:0%"></div>'
       + '<div class="tl-node" style="left:' + posClose + '%"></div>'
       + '<div class="tl-node due" style="left:100%"></div>'
       + todayNode
       + '<div class="tl-lab at-start"><span class="d">' + fmtDate(cycleStart) + '</span><span class="t">billing period begins</span></div>'
-      + '<div class="tl-lab at-mid" style="left:' + posClose + '%"><span class="d" style="color:var(--accent)">' + fmtDate(close) + '</span><span class="t">balance reported to bureaus</span></div>'
-      + '<div class="tl-lab at-end"><span class="d">' + fmtDate(due) + '</span><span class="t">pay by here \u2014 too late to change what reported</span></div>';
+      + '<div class="tl-lab at-mid" style="left:' + posClose + '%"><span class="d" style="color:var(--accent)">' + closeLab + '</span><span class="t">balance reported to bureaus</span></div>'
+      + '<div class="tl-lab at-end"><span class="d">' + dueLab + '</span><span class="t">pay by here — too late to change what reported</span></div>';
   }
 
   function compute() {
@@ -505,13 +537,11 @@
     var c = compute();
     var t = state.target;
     var tLabel = (t === 9 ? "under 10" : t);
-    var rawDays = daysFromToday(state.closeDate);
-    var days = rawDays;
-    var dayNote = "";
-    if (rawDays !== null && rawDays < 0) {
-      var today = new Date(); today.setHours(0,0,0,0);
-      days = Math.round((nextOccurrence(state.closeDate) - today) / 86400000);
-      dayNote = " (your next statement close)";
+    var cyc = cycleDates();
+    var days = null;
+    if (cyc) {
+      var today0 = new Date(); today0.setHours(0,0,0,0);
+      days = Math.round((cyc.close - today0) / 86400000);
     }
 
     if (!c) {
@@ -525,8 +555,13 @@
 
     var html = "";
     if (c.payTo > 0) {
-      var when = state.closeDate ? "your statement closes" : "the closing date";
-      var dayStr = (days !== null && days >= 0) ? ' \u2014 <b>' + days + ' day' + (days === 1 ? '' : 's') + '</b> from now' + dayNote + '.' : '.';
+      var when = cyc ? "your statement closes" : "the closing date";
+      var dateTag = cyc
+        ? (cyc.estimated
+            ? ' (≈ ' + fmtDate(cyc.close) + ', estimated from your due date)'
+            : ' (' + fmtDate(cyc.close) + ')')
+        : '';
+      var dayStr = (days !== null && days >= 0) ? ' — <b>' + days + ' day' + (days === 1 ? '' : 's') + '</b> from now' + dateTag + '.' : '.';
       html += '<div class="result-label">Pay down before closing</div>'
         + '<div class="result-main">Pay <span class="amt">' + fmt(c.payTo) + '</span> before ' + when + dayStr + '</div>'
         + '<div class="result-sub">That drops your reported balance to <b>' + fmt(c.reportedAfter) + '</b>, landing you at <b>' + tLabel + '%</b> utilization.</div>';
@@ -534,6 +569,10 @@
       html += '<div class="result-label">You\u2019re already there</div>'
         + '<div class="result-main">At <span class="amt">' + c.util.toFixed(0) + '%</span>, you\u2019re already under your ' + (t === 9 ? "10" : t) + '% target \u2014 nothing to pay down.</div>'
         + '<div class="result-sub">If the balance holds through your closing date, that\u2019s what reports.</div>';
+    }
+
+    if (cyc && cyc.estimated) {
+      html += '<div class="est-note">Estimated from your <b>due date</b> — your real closing date may be a few days earlier. Confirm your closing date in your card’s app for exact timing.</div>';
     }
 
     var barWidth = Math.min(100, c.util);
@@ -571,7 +610,27 @@
     render();
   });
   document.getElementById("f-date").addEventListener("input", function (e) {
-    state.closeDate = e.target.value; render();
+    state.dateVal = e.target.value; render();
+  });
+  document.getElementById("f-datemode").addEventListener("click", function (e) {
+    var btn = e.target.closest("button");
+    if (!btn) return;
+    state.dateMode = btn.getAttribute("data-m");
+    var btns = this.querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.remove("on");
+      btns[i].setAttribute("aria-checked", "false");
+    }
+    btn.classList.add("on");
+    btn.setAttribute("aria-checked", "true");
+    // clear the date so a due date isn't misread as a closing date (and vice-versa)
+    state.dateVal = "";
+    document.getElementById("f-date").value = "";
+    var lab = document.getElementById("f-date-label");
+    lab.innerHTML = (state.dateMode === "due")
+      ? 'Payment due date <span class="hint">— the day your payment is due</span>'
+      : 'Statement closing date <span class="hint">— the day your billing cycle ends</span>';
+    render();
   });
   document.getElementById("f-seg").addEventListener("click", function (e) {
     var btn = e.target.closest("button");
