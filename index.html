@@ -238,6 +238,83 @@
   .deep { margin-top: 14px; font-size: 13px; color: var(--muted); font-family: var(--mono); }
   .deep b { color: var(--accent); }
 
+  /* ---- Multi-card tool ---- */
+  .multi { padding: 26px 0 8px; }
+  .multi-title {
+    font-size: 24px;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+    font-weight: 660;
+  }
+  .multi-lede { margin-bottom: 14px; color: var(--muted); font-size: 16.5px; }
+  .m-empty { padding: 18px 20px; color: var(--muted); font-size: 14px; }
+  .m-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+  }
+  .m-name { min-width: 0; font-weight: 640; }
+  .m-amounts, .m-close {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .m-amounts { margin-left: auto; }
+  .m-chip {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .m-chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .m-chip.danger { background: rgba(177, 54, 54, 0.09); color: var(--danger); }
+  .m-remove {
+    flex: 0 0 auto;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 3px;
+  }
+  .m-form-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 0.85fr auto;
+    border-bottom: 1px solid var(--line);
+  }
+  .m-field {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 16px 12px;
+    border-right: 1px solid var(--line);
+  }
+  .m-field .pre { font-family: var(--mono); color: var(--muted); }
+  .m-field .input-mono { font-size: 14px; min-width: 0; }
+  .m-add {
+    align-self: center;
+    margin: 0 12px;
+    padding: 8px 13px;
+    border: none;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .m-error { min-height: 0; padding: 0 16px; color: var(--danger); font-size: 12px; }
+  .m-error:not(:empty) { padding-top: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+
   /* ---- prose / SEO content ---- */
   main.prose { padding: 18px 0 70px; }
   .prose h2 {
@@ -300,6 +377,12 @@
   @media (max-width: 560px) {
     .calc-grid { grid-template-columns: 1fr; }
     .field { border-right: none; }
+    .m-row { align-items: flex-start; flex-wrap: wrap; }
+    .m-amounts { margin-left: 0; width: 100%; }
+    .m-remove { margin-left: auto; }
+    .m-form-row { grid-template-columns: 1fr; }
+    .m-field { border-right: none; border-bottom: 1px solid var(--line); }
+    .m-add { margin: 12px; justify-self: start; }
     .hero { padding: 40px 0 26px; }
   }
 </style>
@@ -365,6 +448,27 @@
   </div>
 
   <div class="wrap">
+    <section class="multi" id="multi">
+      <h2 class="multi-title">All your cards together</h2>
+      <p class="multi-lede">Scoring models look at utilization per card <em>and</em> across everything combined. Add your cards (saved only in this browser — nothing is uploaded) to see both.</p>
+      <div class="calc">
+        <div id="m-list"></div>
+        <form id="m-form" autocomplete="off">
+          <div class="m-form-row">
+            <div class="m-field"><input id="m-name" class="input-mono" type="text" placeholder="Card name (optional)"></div>
+            <div class="m-field"><span class="pre">$</span><input id="m-limit" class="input-mono" inputmode="decimal" placeholder="Limit"></div>
+            <div class="m-field"><span class="pre">$</span><input id="m-balance" class="input-mono" inputmode="decimal" placeholder="Balance"></div>
+            <div class="m-field"><input id="m-closeday" class="input-mono" type="number" min="1" max="31" placeholder="Closing day" aria-label="Closing day"></div>
+            <button class="m-add" type="submit">Add card</button>
+          </div>
+          <div class="m-error" id="m-error" role="alert"></div>
+        </form>
+        <div class="result empty" id="m-result" role="status" aria-live="polite"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap">
     <main class="prose">
       <h2><span class="num">01</span>What credit utilization actually is</h2>
       <p><span class="k">Utilization</span> is the percentage of your available credit you're using: your reported balance divided by your credit limit. If you have a $10,000 limit and $3,000 reports, that's 30% utilization. It's one of the biggest factors in your score — second only to payment history for most scoring models.</p>
@@ -380,7 +484,7 @@
 
       <h2><span class="num">03</span>What number should you aim for?</h2>
       <p>Under <span class="k">30%</span> is the common guideline, but it's a ceiling, not a goal. The lowest scores come from people reporting in the single digits. Many people target <span class="k">under 10%</span> on the cards they want reporting low — and some leave a small balance (1–9%) rather than reporting exactly zero, since a tiny reported balance can score slightly better than none at all.</p>
-      <p>This applies per card <em>and</em> across all your cards combined. The tool above handles one card; total utilization across every card is where a multi-card view helps — that's on the roadmap.</p>
+      <p>This applies per card <em>and</em> across all your cards combined. The tool above handles one card; the <a href="#multi">multi-card section</a> below adds them up and shows your combined number, which scoring models weigh alongside each card's own.</p>
 
       <h2><span class="num">04</span>Does paying early actually help?</h2>
       <p>Yes — timing is the whole lever. Paying down before the closing date lowers the balance that gets reported, which lowers your utilization, which can lift your score within a cycle or two as the new balance reports. Nothing else about your behavior has to change. You're just moving the payment to <em>before</em> the snapshot instead of after.</p>
@@ -459,10 +563,29 @@
 
   var resultEl = document.getElementById("f-result");
   var timelineEl = document.getElementById("f-timeline");
+  var mListEl = document.getElementById("m-list");
+  var mFormEl = document.getElementById("m-form");
+  var mResultEl = document.getElementById("m-result");
+  var mErrorEl = document.getElementById("m-error");
 
   function fmtDate(d) {
     return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   }
+
+  function loadCards() {
+    try {
+      var c = JSON.parse(localStorage.getItem("reportslow-cards"));
+      return Array.isArray(c) ? c : [];
+    } catch(e) {
+      return [];
+    }
+  }
+  function saveCards() {
+    try {
+      localStorage.setItem("reportslow-cards", JSON.stringify(mCards));
+    } catch(e) {}
+  }
+  var mCards = loadCards();
 
   // Resolves whatever date the user knows into the UPCOMING closing cycle.
   // due mode: issuers close 21–25 days before the due date, so we estimate a WINDOW
@@ -524,6 +647,131 @@
     var d = new Date(iso + "T00:00:00");
     while (d < today) { d = new Date(d.getFullYear(), d.getMonth()+1, d.getDate()); }
     return d;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (ch) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+    });
+  }
+
+  function ordinal(n) {
+    var mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 13) return "th";
+    return n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
+  }
+
+  function nextCloseDate(day) {
+    var today = new Date(); today.setHours(0,0,0,0);
+    var year = today.getFullYear();
+    var month = today.getMonth();
+    var last = new Date(year, month + 1, 0).getDate();
+    var d = new Date(year, month, Math.min(day, last));
+    if (d < today) {
+      month += 1;
+      last = new Date(year, month + 1, 0).getDate();
+      d = new Date(year, month, Math.min(day, last));
+    }
+    return d;
+  }
+
+  function renderMulti() {
+    var mathTarget = state.target === 9 ? 10 : state.target;
+    var tLabel = state.target === 9 ? "under 10" : state.target;
+    var rows = "";
+    var validCards = [];
+    var nextCard = null;
+
+    if (!mCards.length) {
+      rows = '<div class="m-empty">No cards yet — add your first below.</div>';
+    } else {
+      for (var i = 0; i < mCards.length; i++) {
+        var card = mCards[i] || {};
+        var name = String(card.name || "").trim() || ("Card " + (i + 1));
+        var limit = Number(card.limit);
+        var balance = Number(card.balance);
+        var valid = limit > 0 && balance >= 0 && isFinite(limit) && isFinite(balance);
+        var util = valid ? balance / limit * 100 : 0;
+        var chipClass = util > 50 ? " danger" : util > mathTarget ? " warn" : "";
+        var closeDay = Number(card.closeDay);
+        var hasCloseDay = Number.isInteger(closeDay) && closeDay >= 1 && closeDay <= 31;
+
+        if (valid) validCards.push({ name: name, limit: limit, balance: balance, util: util });
+        if (hasCloseDay) {
+          var closeDate = nextCloseDate(closeDay);
+          if (!nextCard || closeDate < nextCard.date) {
+            nextCard = { name: name, date: closeDate };
+          }
+        }
+
+        rows += '<div class="m-row">'
+          + '<span class="m-name">' + esc(name) + '</span>'
+          + '<span class="m-amounts">' + fmt(balance) + ' of ' + fmt(limit) + '</span>'
+          + '<span class="m-chip' + chipClass + '">' + util.toFixed(0) + '%</span>'
+          + (hasCloseDay ? '<span class="m-close">closes the ' + closeDay + ordinal(closeDay) + '</span>' : '')
+          + '<button class="m-remove" type="button" data-index="' + i + '" aria-label="Remove ' + esc(name) + '">×</button>'
+          + '</div>';
+      }
+    }
+    mListEl.innerHTML = rows;
+
+    if (validCards.length < 2) {
+      mResultEl.className = "result empty";
+      mResultEl.innerHTML = '<div class="result-label">Total utilization</div>'
+        + '<div class="result-main">Add at least two cards to see your combined picture.</div>';
+      return;
+    }
+
+    var totalBal = 0;
+    var totalLim = 0;
+    for (var j = 0; j < validCards.length; j++) {
+      totalBal += validCards[j].balance;
+      totalLim += validCards[j].limit;
+    }
+    var totalUtil = totalBal / totalLim * 100;
+    var aggTargetBal = totalLim * mathTarget / 100;
+    var aggPayTo = Math.max(0, totalBal - aggTargetBal);
+    mResultEl.className = "result" + (totalUtil > mathTarget ? " over" : "");
+
+    var html = '<div class="result-label">Total utilization — all cards</div>'
+      + '<div class="result-main"><span class="amt">' + totalUtil.toFixed(1) + '%</span> across '
+      + fmt(totalBal) + ' of ' + fmt(totalLim) + ' total limit.</div>';
+    if (aggPayTo > 0) {
+      html += '<div class="result-sub">Paying down <b>' + fmt(aggPayTo)
+        + '</b> total brings the combined number to ' + tLabel + '%.</div>';
+    } else {
+      html += '<div class="result-sub">Your combined utilization is already under '
+        + (state.target === 9 ? "10" : state.target)
+        + '% — keep individual cards under it too and you\'re set.</div>';
+    }
+
+    var barClass = totalUtil > 50 ? " danger" : totalUtil > mathTarget ? " warn" : "";
+    var markLabel = (state.target === 9 ? "<10" : state.target) + "%";
+    html += '<div class="bar-block">'
+      + '<div class="bar-top"><span class="u-now">' + totalUtil.toFixed(1) + '% used now</span>'
+      + '<span class="u-cap">' + fmt(totalBal) + ' of ' + fmt(totalLim) + '</span></div>'
+      + '<div class="bar"><div class="bar-fill' + barClass + '" style="width:' + Math.min(100, totalUtil) + '%"></div>'
+      + '<div class="bar-target" data-label="' + markLabel + '" style="left:' + mathTarget + '%"></div></div>';
+
+    for (var k = 0; k < validCards.length; k++) {
+      var actionCard = validCards[k];
+      if (actionCard.util > mathTarget) {
+        var cardPayTo = actionCard.balance - actionCard.limit * mathTarget / 100;
+        html += '<div class="deep">' + esc(actionCard.name) + ': pay down <b>' + fmt(cardPayTo)
+          + '</b> (now ' + actionCard.util.toFixed(0) + '%).</div>';
+      }
+    }
+    html += '</div>';
+
+    if (nextCard) {
+      var today = new Date(); today.setHours(0,0,0,0);
+      var days = Math.round((nextCard.date - today) / 86400000);
+      html += '<div class="est-note">Next snapshot: <b>' + esc(nextCard.name) + '</b> closes in <b>'
+        + days + ' day' + (days === 1 ? '' : 's') + '</b> (' + fmtDate(nextCard.date)
+        + ') — that card\'s balance gets photographed first.</div>';
+    }
+
+    mResultEl.innerHTML = html;
   }
 
   function renderTimeline() {
@@ -649,6 +897,45 @@
     resultEl.innerHTML = html;
   }
 
+  mFormEl.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var nameInput = document.getElementById("m-name");
+    var limitRaw = document.getElementById("m-limit").value.replace(/[^0-9.]/g, "");
+    var balanceRaw = document.getElementById("m-balance").value.replace(/[^0-9.]/g, "");
+    var closeRaw = document.getElementById("m-closeday").value.trim();
+    var limit = parseFloat(limitRaw);
+    var balance = parseFloat(balanceRaw);
+    var closeDay = closeRaw === "" ? null : Number(closeRaw);
+    var closeValid = closeDay === null || (Number.isInteger(closeDay) && closeDay >= 1 && closeDay <= 31);
+
+    if (!(limit > 0) || !(balance >= 0) || !closeValid) {
+      mErrorEl.textContent = "Enter at least a limit and balance (closing day optional).";
+      return;
+    }
+
+    mErrorEl.textContent = "";
+    mCards.push({
+      name: nameInput.value.trim(),
+      limit: limit,
+      balance: balance,
+      closeDay: closeDay
+    });
+    saveCards();
+    renderMulti();
+    mFormEl.reset();
+    nameInput.focus();
+  });
+
+  mListEl.addEventListener("click", function (e) {
+    var btn = e.target.closest(".m-remove");
+    if (!btn) return;
+    var index = parseInt(btn.getAttribute("data-index"), 10);
+    if (isNaN(index) || index < 0 || index >= mCards.length) return;
+    mCards.splice(index, 1);
+    saveCards();
+    renderMulti();
+  });
+
   document.getElementById("f-limit").addEventListener("input", function (e) {
     state.limit = e.target.value.replace(/[^0-9.]/g, "");
     e.target.value = withCommas(state.limit);
@@ -694,6 +981,7 @@
     btn.classList.add("on");
     btn.setAttribute("aria-checked", "true");
     render();
+    renderMulti();
   });
   resultEl.addEventListener("click", function (e) {
     var btn = e.target.closest("#f-ics");
@@ -703,6 +991,7 @@
   });
 
   render();
+  renderMulti();
 })();
 </script>
 </body>
