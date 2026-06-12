@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://reportslow.com/sitemap.xml
+Sitemap: https://ababa1326.github.io/reportslow/sitemap.xml

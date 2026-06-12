@@ -15,9 +15,9 @@ The free tier is a **static site** — no build step, no server, no dependencies
 - `SPEC-*.md`, `HANDOFF.md`, `DEPLOY.md`, `.claude/`
 
 ## Domain
-`reportslow.com` was available as of 2026-06-10 — register it before launch.
-All canonical/OG URLs are already hard-coded to `https://reportslow.com/`. If you pick a
-different domain, search-and-replace that string in `index.html`, `robots.txt`, `sitemap.xml`.
+Deployed free at https://ababa1326.github.io/reportslow/ via GitHub Pages. The custom domain
+(`reportslow.com`) is deliberately deferred until the tool shows traction. If registered later,
+swap the URLs back in one pass and 301 from the github.io URL.
 
 ## Host options (pick one — all free)
 **Netlify / Vercel (drag-and-drop):** drop this folder into the dashboard; it serves `index.html`
