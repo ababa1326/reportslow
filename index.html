@@ -187,6 +187,14 @@
   .result-sub b { font-weight: 640; }
   .est-note { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
   .est-note b { color: var(--accent); font-weight: 640; }
+  .ics-btn {
+    display: inline-block; margin-top: 16px; padding: 9px 14px;
+    font-family: var(--mono); font-size: 13px; color: var(--accent);
+    background: #fff; border: 1px solid var(--accent); border-radius: 9px;
+    cursor: pointer; text-decoration: none;
+  }
+  .ics-btn:hover { background: var(--accent); color: #fff; }
+  .ics-hint { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); }
   .overlimit-note {
     margin-top: 16px;
     padding: 10px 12px;
@@ -472,6 +480,36 @@
     return { close: close, due: due, estimated: state.dateMode === "due" };
   }
 
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function icsDate(d) { return d.getFullYear() + pad2(d.getMonth()+1) + pad2(d.getDate()); }
+  function downloadReminderICS(close) {
+    var remind = new Date(close.getTime() - 3*86400000);
+    var stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    var lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//ReportsLow//Statement Reminder//EN",
+      "BEGIN:VEVENT",
+      "UID:reportslow-" + Date.now() + "@reportslow",
+      "DTSTAMP:" + stamp,
+      "DTSTART;VALUE=DATE:" + icsDate(remind),
+      "RRULE:FREQ=MONTHLY",
+      "SUMMARY:Pay down credit card — statement closes in 3 days",
+      "DESCRIPTION:Pay your balance down BEFORE the statement closing date so a low balance " +
+        "gets reported to the credit bureaus. Free calculator: see ReportsLow.",
+      "END:VEVENT",
+      "END:VCALENDAR"
+    ];
+    var blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/calendar" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "statement-reminder.ics";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+  }
+
   function nextOccurrence(iso) {
     // next monthly recurrence of that day-of-month that is >= today, returns a Date
     var today = new Date(); today.setHours(0,0,0,0);
@@ -595,6 +633,10 @@
       html += '<div class="deep">To reach under 10% instead, pay down <b>' + fmt(c.payToTen) + '</b> (reports ' + fmt(c.subTen) + ').</div>';
     }
     html += '</div>';
+    if (cyc) {
+      html += '<button class="ics-btn" id="f-ics" type="button">📅 Download a monthly reminder (3 days before closing)</button>'
+        + '<span class="ics-hint">A repeating calendar event — works with Google, Apple, and Outlook calendars. Nothing leaves your browser.</span>';
+    }
 
     resultEl.innerHTML = html;
   }
@@ -644,6 +686,12 @@
     btn.classList.add("on");
     btn.setAttribute("aria-checked", "true");
     render();
+  });
+  resultEl.addEventListener("click", function (e) {
+    var btn = e.target.closest("#f-ics");
+    if (!btn) return;
+    var cyc = cycleDates();
+    if (cyc) downloadReminderICS(cyc.close);
   });
 
   render();
