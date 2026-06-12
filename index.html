@@ -465,20 +465,27 @@
   }
 
   // Resolves whatever date the user knows into the UPCOMING closing cycle.
-  // due mode: closing is estimated as due - 21 days. Either way, roll forward to
-  // the next cycle whose closing date is today or later.
+  // due mode: issuers close 21–25 days before the due date, so we estimate a WINDOW
+  // [due-25, due-21] and anchor advice to its EARLY edge (safe side). Either way,
+  // roll forward to the next cycle that hasn't fully closed yet.
   function cycleDates() {
     if (!state.dateVal) return null;
     var today = new Date(); today.setHours(0,0,0,0);
     var entered = new Date(state.dateVal + "T00:00:00");
-    var close = (state.dateMode === "due")
-      ? new Date(entered.getTime() - 21*86400000)
-      : entered;
+    if (state.dateMode === "due") {
+      var due = entered;
+      while (new Date(due.getTime() - 21*86400000) < today) {
+        due = new Date(due.getFullYear(), due.getMonth()+1, due.getDate());
+      }
+      var closeEarly = new Date(due.getTime() - 25*86400000);
+      var closeLate = new Date(due.getTime() - 21*86400000);
+      return { close: closeEarly, closeLate: closeLate, due: due, estimated: true };
+    }
+    var close = entered;
     while (close < today) {
       close = new Date(close.getFullYear(), close.getMonth()+1, close.getDate());
     }
-    var due = new Date(close.getTime() + 21*86400000);
-    return { close: close, due: due, estimated: state.dateMode === "due" };
+    return { close: close, closeLate: close, due: new Date(close.getTime() + 21*86400000), estimated: false };
   }
 
   function pad2(n) { return (n < 10 ? "0" : "") + n; }
@@ -545,7 +552,7 @@
 
     var closeEst = (state.dateMode === "due");
     var dueEst = (state.dateMode === "close");
-    var closeLab = (closeEst ? "≈ " : "") + fmtDate(close);
+    var closeLab = closeEst ? ("≈ " + fmtDate(close) + "–" + fmtDate(cyc.closeLate)) : fmtDate(close);
     var dueLab = (dueEst ? "≈ " : "") + fmtDate(due);
 
     timelineEl.innerHTML = '<div class="tl-fill" style="width:' + posToday + '%"></div>'
@@ -597,7 +604,7 @@
       var when = cyc ? "your statement closes" : "the closing date";
       var dateTag = cyc
         ? (cyc.estimated
-            ? ' (≈ ' + fmtDate(cyc.close) + ', estimated from your due date)'
+            ? ' (likely ' + fmtDate(cyc.close) + '–' + fmtDate(cyc.closeLate) + ' — we count down to the earlier date to be safe)'
             : ' (' + fmtDate(cyc.close) + ')')
         : '';
       var dayStr = (days !== null && days >= 0) ? ' — <b>' + days + ' day' + (days === 1 ? '' : 's') + '</b> from now' + dateTag + '.' : '.';
@@ -611,7 +618,7 @@
     }
 
     if (cyc && cyc.estimated) {
-      html += '<div class="est-note">Estimated from your <b>due date</b> — your real closing date may be a few days earlier. Confirm your closing date in your card’s app for exact timing.</div>';
+      html += '<div class="est-note">Estimated from your <b>due date</b>: issuers close 21–25 days before the payment due date, so your real closing date is likely between <b>' + fmtDate(cyc.close) + '</b> and <b>' + fmtDate(cyc.closeLate) + '</b>. We count down to the earlier date so you can’t be late. Confirm the exact date in your card’s app.</div>';
     }
 
     var barWidth = Math.min(100, c.util);
